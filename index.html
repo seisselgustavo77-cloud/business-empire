@@ -32,7 +32,8 @@ footer{max-width:1100px;margin:14px auto 35px;padding:0 16px;color:var(--muted);
 </div>
 </main>
 <footer>Protótipo demonstrativo: os dados ficam neste navegador. Ainda não há salas online, sincronização entre celulares nem IA conectada. Essas funções exigem backend e integração externa.</footer>
-<script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script> 
 const names=['Tiago G','Mosquito','Thiago M','Henrique A'];
 const starters=[
 {name:'Assistência de celulares',price:7000,income:1100,risk:'Médio',sector:'Serviços'},
@@ -66,4 +67,233 @@ function simulateAI(){let s=document.getElementById('story').value.trim();let li
 function nextRound(){if(!confirm('Encerrar a rodada e avançar um ano?'))return;state.companies.forEach(c=>c.owners.forEach(o=>{let income=Math.round(c.income*o.share/100);state.players[o.player].cash+=income;}));state.players.forEach(p=>p.cash+=14000);state.round++;state.age++;let pool=starters.concat([{name:'Pequena gráfica local',price:16000,income:2400,risk:'Médio',sector:'Serviços'},{name:'Distribuidora regional',price:22000,income:3300,risk:'Alto',sector:'Logística'},{name:'Franquia de alimentação',price:28000,income:4100,risk:'Médio',sector:'Alimentação'}]);state.market=Array.from({length:3},()=>({...pool[Math.floor(Math.random()*pool.length)],id:Math.random().toString(36).slice(2)}));state.log.push(`Rodada ${state.round-1} fechada: rendimentos distribuídos, salários de R$ 14.000 pagos. Início da rodada ${state.round}.`);save();render();}
 function resetGame(){if(confirm('Apagar esta partida deste navegador e começar de novo?')){state=fresh();newMarket();save();render();}}
 load();
+</script><script>
+const SUPABASE_URL = 'https://qlsonlttgjepdrjajhsc.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_RHzXMoiJn4f90LntnYPaiQ_FnPlZU8e';
+
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+let currentRoom = null;
+let roomChannel = null;
+
+document.body.insertAdjacentHTML('afterbegin', `
+<style>
+#onlineScreen {
+ position:fixed; inset:0; z-index:9999;
+ background:#0b1020; display:flex;
+ justify-content:center; align-items:center;
+ padding:20px; overflow:auto;
+}
+.onlineBox {
+ width:100%; max-width:430px;
+ background:#141d31; border:1px solid #2a3855;
+ border-radius:18px; padding:25px;
+}
+.onlineBox h2 {color:#e5b85c}
+.onlineBox button {width:100%;margin:6px 0}
+.onlineBox input,.onlineBox select {margin-bottom:12px}
+#roomStatus {color:#55d6a0;font-size:13px}
+</style>
+
+<div id="onlineScreen">
+ <div class="onlineBox">
+  <h2>BUSINESS EMPIRE</h2>
+  <p>Entre em uma partida online.</p>
+
+  <label>Seu nome no jogo</label>
+  <input id="nickname" maxlength="20"
+   placeholder="Digite seu nome">
+
+  <button class="primary" onclick="createRoom()">
+   Criar sala
+  </button>
+
+  <label>Quantidade máxima de jogadores</label>
+  <select id="maxPlayers">
+   <option value="2">2 jogadores</option>
+   <option value="3">3 jogadores</option>
+   <option value="4" selected>4 jogadores</option>
+   <option value="5">5 jogadores</option>
+   <option value="6">6 jogadores</option>
+   <option value="7">7 jogadores</option>
+   <option value="8">8 jogadores</option>
+  </select>
+
+  <hr style="border-color:#2a3855;margin:18px 0">
+
+  <label>Código da sala</label>
+  <input id="roomCode" maxlength="6"
+   placeholder="Exemplo: A1B2C3">
+
+  <button onclick="joinRoom()">Entrar em uma sala</button>
+
+  <p id="roomStatus"></p>
+  <div id="roomLobby"></div>
+ </div>
+</div>
+`);
+
+function status(message) {
+ document.getElementById('roomStatus').textContent = message;
+}
+
+async function authenticate() {
+ let {data,error} = await db.auth.getSession();
+
+ if(error) throw error;
+
+ if(!data.session) {
+  const result = await db.auth.signInAnonymously();
+  if(result.error) throw result.error;
+ }
+}
+
+async function createRoom() {
+ try {
+  status('Conectando...');
+  await authenticate();
+
+  const nickname = document.getElementById('nickname').value.trim();
+  const max = Number(document.getElementById('maxPlayers').value);
+
+  if(nickname.length < 2) {
+   status('Digite um nome com pelo menos 2 caracteres.');
+   return;
+  }
+
+  const {data,error} = await db.rpc('create_game_room', {
+   p_nickname:nickname,
+   p_max_players:max
+  });
+
+  if(error) throw error;
+
+  await enterLobby(data.room_id,data.room_code);
+
+ } catch(error) {
+  status('Erro: '+error.message);
+ }
+}
+
+async function joinRoom() {
+ try {
+  status('Entrando na sala...');
+  await authenticate();
+
+  const nickname = document.getElementById('nickname').value.trim();
+  const code = document.getElementById('roomCode').value.trim();
+
+  if(nickname.length < 2) {
+   status('Digite um nome com pelo menos 2 caracteres.');
+   return;
+  }
+
+  if(code.length !== 6) {
+   status('Digite um código de 6 caracteres.');
+   return;
+  }
+
+  const {data,error} = await db.rpc('join_game_room', {
+   p_code:code.toUpperCase(),
+   p_nickname:nickname
+  });
+
+  if(error) throw error;
+
+  await enterLobby(data.room_id,data.room_code);
+
+ } catch(error) {
+  status('Erro: '+error.message);
+ }
+}
+
+async function enterLobby(roomId,code) {
+ currentRoom = roomId;
+
+ const {data:players,error} = await db
+  .from('game_players')
+  .select('nickname,age,cash')
+  .eq('room_id',roomId);
+
+ if(error) throw error;
+
+ document.getElementById('roomLobby').innerHTML = `
+  <div style="background:#1b2740;padding:15px;border-radius:12px;margin-top:15px">
+   <h3>Sala criada / acessada</h3>
+   <p>Código para seus amigos:</p>
+   <h2 style="letter-spacing:5px;color:#e5b85c">${code}</h2>
+   <button onclick="copyRoomCode('${code}')">Copiar código</button>
+   <h3>Jogadores na sala</h3>
+   <div id="onlinePlayers"></div>
+   <p class="notice">Aguardando os jogadores entrarem...</p>
+   <button class="primary" onclick="closeLobby()">Ir para o protótipo</button>
+  </div>
+ `;
+
+ renderOnlinePlayers(players);
+ status('Conectado à sala!');
+
+ if(roomChannel) {
+  await db.removeChannel(roomChannel);
+ }
+
+ roomChannel = db.channel('room-'+roomId)
+  .on('postgres_changes',{
+   event:'*',
+   schema:'public',
+   table:'game_players',
+   filter:'room_id=eq.'+roomId
+  }, async () => {
+   const {data,error} = await db
+    .from('game_players')
+    .select('nickname,age,cash')
+    .eq('room_id',roomId);
+
+   if(!error) renderOnlinePlayers(data);
+  })
+  .subscribe();
+}
+
+function renderOnlinePlayers(players) {
+ const el = document.getElementById('onlinePlayers');
+ if(!el) return;
+
+ el.innerHTML = players.map(p => `
+  <div style="padding:10px;border-bottom:1px solid #2a3855">
+   <b>${escapeHTML(p.nickname)}</b>
+   <small style="display:block;color:#9eacc8">
+    ${p.age} anos · ${money(Number(p.cash))}
+   </small>
+  </div>
+ `).join('');
+}
+
+function escapeHTML(value) {
+ return String(value).replace(/[&<>"']/g, c => ({
+  '&':'&amp;','<':'&lt;','>':'&gt;',
+  '"':'&quot;',"'":'&#39;'
+ }[c]));
+}
+
+function copyRoomCode(code) {
+ navigator.clipboard.writeText(code)
+  .then(() => status('Código copiado!'))
+  .catch(() => status('Não foi possível copiar o código.'));
+}
+
+function closeLobby() {
+ document.getElementById('onlineScreen').style.display='none';
+}
+
+(async function startOnline() {
+ try {
+  await authenticate();
+  status('Login conectado. Crie ou entre em uma sala.');
+ } catch(error) {
+  status('Erro no login: '+error.message);
+ }
+})();
 </script></body></html>
