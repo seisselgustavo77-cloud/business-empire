@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Business Empire — Protótipo</title>
+<style>
+:root{--bg:#0b1020;--panel:#141d31;--panel2:#1b2740;--line:#2a3855;--text:#eef3ff;--muted:#9eacc8;--gold:#e5b85c;--green:#55d6a0;--red:#ff7b86}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#182642,#0b1020 55%);color:var(--text);font:15px/1.45 system-ui,Segoe UI,Arial}
+header{padding:22px max(18px,calc((100vw - 1100px)/2));border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:22px;margin:0;letter-spacing:.08em}h1 span{color:var(--gold)}.sub{color:var(--muted);font-size:12px}
+main{max-width:1100px;margin:22px auto;padding:0 16px}.top{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card,.panel{background:linear-gradient(145deg,var(--panel),#10182a);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 12px 30px #0002}
+.player strong{display:block;font-size:13px;color:var(--muted)}.money{font-size:21px;font-weight:750;margin-top:5px}.pill{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 9px;color:var(--muted);font-size:11px}
+.layout{display:grid;grid-template-columns:1.15fr .85fr;gap:14px;margin-top:14px}.panel h2{font-size:17px;margin:0 0 12px}.tabs{display:flex;gap:7px;flex-wrap:wrap;margin:16px 0}.tabs button,button{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px 13px;border-radius:10px;cursor:pointer;font-weight:650}.tabs button.active,button.primary{background:var(--gold);color:#1b1a16;border-color:var(--gold)}button:disabled{opacity:.45;cursor:not-allowed}
+.company{padding:12px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center}.company:first-of-type{border-top:0}.company small{display:block;color:var(--muted)}.actions{display:flex;gap:7px;flex-wrap:wrap}.actions button{font-size:12px;padding:8px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--line);background:#0d1526;color:var(--text);border-radius:9px;margin:5px 0 11px}
+label{font-size:12px;color:var(--muted)}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.notice{color:var(--muted);font-size:12px}.event{border-left:3px solid var(--gold);padding:9px 12px;background:#ffffff08;margin:8px 0;border-radius:0 9px 9px 0}
+#feed{max-height:290px;overflow:auto}.trade{padding:10px;border:1px solid var(--line);border-radius:10px;margin:8px 0}.trade p{margin:4px 0;color:var(--muted);font-size:13px}.status{color:var(--gold);font-size:11px}
+footer{max-width:1100px;margin:14px auto 35px;padding:0 16px;color:var(--muted);font-size:11px}
+@media(max-width:760px){.top{grid-template-columns:1fr 1fr}.layout{grid-template-columns:1fr}.money{font-size:18px}header{padding:18px}}
+</style></head>
+<body>
+<header><div><h1>BUSINESS <span>EMPIRE</span></h1><div class="sub">Construa seu império. Negocie. Cresça.</div></div><div><span class="pill" id="round">RODADA 1 · IDADE 18</span> <button onclick="resetGame()">Reiniciar partida</button></div></header>
+<main>
+<section class="top" id="players"></section>
+<nav class="tabs">
+<button class="active" onclick="showTab('market',this)">Mercado</button><button onclick="showTab('portfolio',this)">Empresas</button><button onclick="showTab('trade',this)">Negociações</button><button onclick="showTab('ai',this)">Central da IA</button>
+</nav>
+<div class="layout">
+<section class="panel" id="mainPanel"></section>
+<aside class="panel"><h2>📜 Histórico da partida</h2><div id="feed"></div></aside>
+</div>
+</main>
+<footer>Protótipo demonstrativo: os dados ficam neste navegador. Ainda não há salas online, sincronização entre celulares nem IA conectada. Essas funções exigem backend e integração externa.</footer>
+<script>
+const names=['Tiago G','Mosquito','Thiago M','Henrique A'];
+const starters=[
+{name:'Assistência de celulares',price:7000,income:1100,risk:'Médio',sector:'Serviços'},
+{name:'Loja de roupas de bairro',price:9000,income:1350,risk:'Médio',sector:'Varejo'},
+{name:'Delivery de marmitas',price:6000,income:950,risk:'Alto',sector:'Alimentação'},
+{name:'Lavagem ecológica',price:8000,income:1200,risk:'Baixo',sector:'Serviços'},
+{name:'Mini mercado local',price:11000,income:1600,risk:'Médio',sector:'Varejo'}
+];
+let state;
+function fresh(){return {round:1,age:18,players:names.map(n=>({name:n,cash:12000})),companies:[],offers:[],market:[],events:[],log:['Partida criada. Cada jogador começou com R$ 12.000 aos 18 anos.']};}
+function money(n){return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0})}
+function save(){try{localStorage.setItem('be-proto',JSON.stringify(state))}catch(e){}}
+function load(){try{let x=JSON.parse(localStorage.getItem('be-proto'));state=x||fresh()}catch(e){state=fresh()} if(!state.market.length) newMarket(); render();}
+function newMarket(){state.market=starters.slice(0,3).map(x=>({...x,id:Math.random().toString(36).slice(2),owner:null}));}
+function render(){document.getElementById('round').textContent=`RODADA ${state.round} · IDADE ${state.age}`;document.getElementById('players').innerHTML=state.players.map((p,i)=>`<div class="card player"><strong>${p.name}</strong><div class="money">${money(p.cash)}</div><span class="pill">${state.companies.filter(c=>c.owners.some(o=>o.player===i)).length} empresas</span></div>`).join('');document.getElementById('feed').innerHTML=state.log.slice(-14).reverse().map(x=>`<div class="event">${x}</div>`).join('');showCurrent();}
+let current='market';
+function showTab(t,b){current=t;document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));if(b)b.classList.add('active');showCurrent();}
+function showCurrent(){let el=document.getElementById('mainPanel');
+if(current==='market'){el.innerHTML=`<h2>🏢 Mercado de empresas</h2><p class="notice">Empresas disponíveis para compra nesta rodada. Os valores são exemplos iniciais.</p>`+state.market.map(c=>`<div class="company"><div><b>${c.name}</b><small>${c.sector} · Rendimento estimado ${money(c.income)}/ano · Risco ${c.risk}</small><b>${money(c.price)}</b></div><div class="actions"><button class="primary" onclick="buy('${c.id}')">Comprar</button><button onclick="partner('${c.id}')">Propor sociedade</button></div></div>`).join('')+`<button class="primary" onclick="nextRound()">Encerrar rodada e avançar</button>`}
+if(current==='portfolio'){el.innerHTML='<h2>📊 Empresas e participações</h2>'+ (state.companies.length?state.companies.map(c=>`<div class="company"><div><b>${c.name}</b><small>${c.owners.map(o=>state.players[o.player].name+' '+o.share+'%').join(' · ')}</small><small>Rendimento-base: ${money(c.income)}/ano</small></div><span class="pill">${c.risk}</span></div>`).join(''):'<p class="notice">Ainda não há empresas. Compre uma no Mercado.</p>')}
+if(current==='trade'){el.innerHTML=`<h2>🤝 Central de negociações</h2><div class="formgrid"><div><label>Quem faz a proposta</label><select id="from">${opts()}</select></div><div><label>Para quem</label><select id="to">${opts()}</select></div></div><label>Tipo de acordo</label><select id="kind"><option value="share">Comprar participação de uma empresa</option><option value="sale">Comprar empresa inteira</option><option value="cash">Acordo em dinheiro</option></select><label>Empresa</label><select id="company">${state.companies.map((c,i)=>`<option value="${i}">${c.name}</option>`).join('')}</select><div class="formgrid"><div><label>Porcentagem desejada</label><input id="pct" type="number" min="1" max="100" value="25"></div><div><label>Valor oferecido (R$)</label><input id="amount" type="number" min="1" value="3000"></div></div><button class="primary" onclick="propose()">Enviar proposta</button><h2 style="margin-top:20px">Propostas</h2>${state.offers.length?state.offers.map((o,i)=>`<div class="trade"><b>${state.players[o.from].name} → ${state.players[o.to].name}</b><p>${o.desc} · ${money(o.amount)}</p><span class="status">${o.status}</span> ${o.status==='Pendente'?`<button onclick="accept(${i})">Aceitar</button> <button onclick="reject(${i})">Recusar</button>`:''}</div>`).join(''):'<p class="notice">Nenhuma proposta ainda.</p>'}`}
+if(current==='ai'){el.innerHTML=`<h2>🤖 Central de inteligência</h2><p class="notice">Nesta primeira versão, a central demonstra o fluxo de fechamento. A IA real será conectada depois, por uma API com chave protegida no servidor.</p><label>Conte o que aconteceu nesta rodada</label><textarea id="story" rows="5" placeholder="Ex.: a loja perdeu um fornecedor, a assistência ganhou clientes..."></textarea><button class="primary" onclick="simulateAI()">Analisar rodada (simulação)</button><div id="airesult"></div>`}
+}
+function opts(){return state.players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join('')}
+function buy(id){let c=state.market.find(x=>x.id===id);let p=state.players[0];if(!c||p.cash<c.price)return alert('Saldo insuficiente para o jogador selecionado (por enquanto, comprador padrão: '+p.name+').');p.cash-=c.price;state.companies.push({...c,owners:[{player:0,share:100}]});state.market=state.market.filter(x=>x.id!==id);state.log.push(`${p.name} comprou ${c.name} por ${money(c.price)}.`);save();render();}
+function partner(id){let c=state.market.find(x=>x.id===id);let who=prompt('Número do segundo jogador (1 Tiago, 2 Mosquito, 3 Thiago M, 4 Henrique):');let j=Number(who)-1;if(j<0||j>3||!Number.isInteger(j))return;let a=prompt('Quanto cada um vai investir? Valor por pessoa em R$:');let v=Number(a);if(!v||v*2<c.price)return alert('Informe um investimento válido que cubra o preço.');if(state.players[0].cash<v||state.players[j].cash<v)return alert('Um dos jogadores não tem saldo suficiente.');state.players[0].cash-=v;state.players[j].cash-=v;state.companies.push({...c,owners:[{player:0,share:50},{player:j,share:50}]});state.market=state.market.filter(x=>x.id!==id);state.log.push(`${state.players[0].name} e ${state.players[j].name} compraram ${c.name} em sociedade 50/50.`);save();render();}
+function propose(){let from=+document.getElementById('from').value,to=+document.getElementById('to').value,kind=document.getElementById('kind').value,idx=+document.getElementById('company').value,pct=+document.getElementById('pct').value,amount=+document.getElementById('amount').value;if(from===to)return alert('Escolha jogadores diferentes.');if(!state.companies[idx])return alert('Compre uma empresa antes de negociar participações.');let c=state.companies[idx];if(!c.owners.some(o=>o.player===to))return alert('O destinatário não possui participação nessa empresa.');state.offers.push({from,to,kind,idx,pct,amount,status:'Pendente',desc:kind==='sale'?'Proposta de compra da empresa':kind==='share'?`Oferta por ${pct}% de ${c.name}`:'Acordo em dinheiro'});state.log.push(`${state.players[from].name} enviou uma proposta para ${state.players[to].name}.`);save();showCurrent();}
+function accept(i){let o=state.offers[i],c=state.companies[o.idx];if(!c)return alert('Empresa não encontrada.');let owner=c.owners.find(x=>x.player===o.to);let share=o.kind==='sale'?owner?.share:o.pct;if(!owner||share>owner.share)return alert('O vendedor não possui essa porcentagem.');if(state.players[o.from].cash<o.amount)return alert('Comprador sem saldo suficiente.');state.players[o.from].cash-=o.amount;state.players[o.to].cash+=o.amount;if(o.kind==='sale'||o.kind==='share'){owner.share-=share;let buyer=c.owners.find(x=>x.player===o.from);if(buyer)buyer.share+=share;else c.owners.push({player:o.from,share});c.owners=c.owners.filter(x=>x.share>0);}o.status='Aceita';state.log.push(`Acordo fechado: ${state.players[o.from].name} pagou ${money(o.amount)} a ${state.players[o.to].name} por ${share}% de ${c.name}.`);save();render();}
+function reject(i){state.offers[i].status='Recusada';save();showCurrent();}
+function simulateAI(){let s=document.getElementById('story').value.trim();let lines=state.companies.map(c=>{let delta=(Math.random()*0.16)-0.06;let inc=Math.max(0,Math.round(c.income*(1+delta)));c.income=inc;return `${c.name}: rendimento anual estimado atualizado para ${money(inc)} (${delta>=0?'crescimento':'queda'} de ${Math.abs(delta*100).toFixed(1)}%).`;});let out=document.getElementById('airesult');out.innerHTML='<h3>Relatório demonstrativo</h3>'+lines.map(x=>`<div class="event">${x}</div>`).join('')+(s?`<p class="notice">Informações recebidas: ${s.replaceAll('<','&lt;')}</p>`:'');state.log.push('Relatório econômico demonstrativo gerado.');save();}
+function nextRound(){if(!confirm('Encerrar a rodada e avançar um ano?'))return;state.companies.forEach(c=>c.owners.forEach(o=>{let income=Math.round(c.income*o.share/100);state.players[o.player].cash+=income;}));state.players.forEach(p=>p.cash+=14000);state.round++;state.age++;let pool=starters.concat([{name:'Pequena gráfica local',price:16000,income:2400,risk:'Médio',sector:'Serviços'},{name:'Distribuidora regional',price:22000,income:3300,risk:'Alto',sector:'Logística'},{name:'Franquia de alimentação',price:28000,income:4100,risk:'Médio',sector:'Alimentação'}]);state.market=Array.from({length:3},()=>({...pool[Math.floor(Math.random()*pool.length)],id:Math.random().toString(36).slice(2)}));state.log.push(`Rodada ${state.round-1} fechada: rendimentos distribuídos, salários de R$ 14.000 pagos. Início da rodada ${state.round}.`);save();render();}
+function resetGame(){if(confirm('Apagar esta partida deste navegador e começar de novo?')){state=fresh();newMarket();save();render();}}
+load();
+</script></body></html>
